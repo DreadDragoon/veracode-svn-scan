@@ -1,0 +1,38 @@
+// Example CloudBees CI / Jenkins pipeline for veracode-svn-scan.sh
+// Pipeline scans on every branch, full policy scan on trunk.
+// Replace the credential IDs, agent label, SVN URL and app name with yours.
+
+pipeline {
+  agent { label 'java-build' }
+
+  environment {
+    VERACODE_API_KEY_ID     = credentials('veracode-api-id')
+    VERACODE_API_KEY_SECRET = credentials('veracode-api-key')
+    VERACODE_WRAPPER_JAR    = '/opt/veracode/VeracodeJavaAPI.jar'
+  }
+
+  stages {
+    stage('Veracode') {
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'svn-creds',
+                         usernameVariable: 'SVN_USERNAME',
+                         passwordVariable: 'SVN_PASSWORD')]) {
+          sh '''
+            MODE=pipeline
+            [ "$BRANCH_NAME" = "trunk" ] && MODE=both
+            ./veracode-svn-scan.sh \
+              -u "https://svn.example.com/repos/myapp/${BRANCH_NAME}" \
+              -a "MyApp" \
+              -m "$MODE"
+          '''
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      archiveArtifacts artifacts: 'veracode-work/results/*.json', allowEmptyArchive: true
+    }
+  }
+}
