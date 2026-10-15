@@ -1,0 +1,3 @@
+# Keep shell scripts and Jenkinsfiles on LF, even when edited on Windows
+*.sh       text eol=lf
+Jenkinsfile text eol=lf
