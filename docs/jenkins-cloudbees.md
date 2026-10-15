@@ -128,7 +128,6 @@ pipeline {
   environment {
     VERACODE_API_KEY_ID     = credentials('veracode-api-id')
     VERACODE_API_KEY_SECRET = credentials('veracode-api-key')
-    VERACODE_WRAPPER_JAR    = '/opt/veracode/VeracodeJavaAPI.jar'
   }
 
   stages {
@@ -246,7 +245,6 @@ pipeline {
   environment {
     VERACODE_API_KEY_ID     = credentials('veracode-api-id')
     VERACODE_API_KEY_SECRET = credentials('veracode-api-key')
-    VERACODE_WRAPPER_JAR    = '/opt/veracode/VeracodeJavaAPI.jar'
     POLICY_SCAN_TIMEOUT     = '300'
   }
 
@@ -412,7 +410,7 @@ Label agents that have everything installed (for example `veracode`) and target 
 
 - `bash`, `curl`, `find`, `svn` 1.9+
 - The build tools your apps need (JDK, Maven, Gradle, .NET SDK, Node and so on)
-- Java and `VeracodeJavaAPI.jar` for policy scans
+- Java for policy scans. The script downloads the Java API wrapper the first time and keeps it in `~/.cache/veracode-svn-scan`, so a persistent home directory (or `VERACODE_TOOLS_DIR` on a persistent volume) saves a download per run
 - `jq` if you use the result-parsing snippets
-- Network access to SVN, `*.veracode.com`, your artifact repository and (for SCA) `download.sourceclear.com`
+- Network access to SVN, `*.veracode.com`, Maven Central (or your proxy of it, for the wrapper download), your artifact repository and (for SCA) `download.sourceclear.com`
 - Ideally, the Veracode CLI pre-installed ([use case 16](use-cases.md#16-using-a-pre-installed-or-pinned-veracode-cli))

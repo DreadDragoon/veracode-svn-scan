@@ -35,7 +35,7 @@ export SVN_PASSWORD='your-svn-password'
 13. [Running several scans at once on one agent](#13-running-several-scans-at-once-on-one-agent)
 14. [Failing or not failing the build](#14-failing-or-not-failing-the-build)
 15. [Running in a container or on an OpenShift / Kubernetes agent](#15-running-in-a-container-or-on-an-openshift--kubernetes-agent)
-16. [Using a pre-installed or pinned Veracode CLI](#16-using-a-pre-installed-or-pinned-veracode-cli)
+16. [Using a pre-installed or pinned Veracode CLI and Java wrapper](#16-using-a-pre-installed-or-pinned-veracode-cli-and-java-wrapper)
 17. [Debugging a scan that went wrong](#17-debugging-a-scan-that-went-wrong)
 
 ## Picking a scan mode
@@ -67,7 +67,7 @@ java -version      # needed for Java apps and for policy scans
 mvn -v             # or gradle -v, dotnet --version, node -v, depending on the app
 ```
 
-You don't need to install the Veracode CLI first. The script installs it into the current folder if it can't find it. (If you'd rather install it yourself, see [use case 16](#16-using-a-pre-installed-or-pinned-veracode-cli).)
+You don't need to install the Veracode CLI first. The script installs it into the current folder if it can't find it. (If you'd rather install it yourself, see [use case 16](#16-using-a-pre-installed-or-pinned-veracode-cli-and-java-wrapper).)
 
 ### Step 2: Check you can reach the SVN repo
 
@@ -196,8 +196,6 @@ Run `svn ls https://svn.example.com/repos/myapp/branches` to see what's there.
 **When:** You're cutting a release and need the policy result for sign-off.
 
 ```bash
-export VERACODE_WRAPPER_JAR=/opt/veracode/VeracodeJavaAPI.jar
-
 ./veracode-svn-scan.sh \
   -u https://svn.example.com/repos/myapp/tags/1.4.0 \
   -a "MyApp" \
@@ -214,6 +212,7 @@ export VERACODE_WRAPPER_JAR=/opt/veracode/VeracodeJavaAPI.jar
 ### Before you start
 
 - The `MyApp` profile has to exist in the Veracode Platform, and the name has to match exactly, including case and spaces.
+- The first policy scan on a machine downloads the Veracode Java API wrapper from Maven Central and caches it. Later runs reuse it. If your agents can't reach Maven Central, set `VERACODE_WRAPPER_REPO` to your Nexus or Artifactory proxy, or set `VERACODE_WRAPPER_JAR` to a copy you already have.
 - Big apps can take a long time to scan. If you hit the timeout, raise it:
 
   ```bash
@@ -312,7 +311,6 @@ export VERACODE_API_KEY_ID='...'
 export VERACODE_API_KEY_SECRET='...'
 export SVN_USERNAME='...'
 export SVN_PASSWORD='...'
-export VERACODE_WRAPPER_JAR=/opt/veracode/VeracodeJavaAPI.jar
 export SRCCLR_API_TOKEN='...'
 ```
 
@@ -333,7 +331,6 @@ export SRCCLR_API_TOKEN='...'
 **When:** Release sign-off, a security review, or the first time an app is onboarded to Veracode.
 
 ```bash
-export VERACODE_WRAPPER_JAR=/opt/veracode/VeracodeJavaAPI.jar
 export SRCCLR_API_TOKEN='your-sca-token'
 
 ./veracode-svn-scan.sh \
@@ -513,7 +510,7 @@ mkdir -p verascan && cp legacy-src/dist/*.zip verascan/
 # 3a. Pipeline scan
 veracode static scan verascan/legacy-app.zip
 
-# 3b. Policy scan
+# 3b. Policy scan (if you've run the script before, the wrapper is cached in ~/.cache/veracode-svn-scan)
 java -jar "$VERACODE_WRAPPER_JAR" \
   -vid "$VERACODE_API_KEY_ID" -vkey "$VERACODE_API_KEY_SECRET" \
   -action UploadAndScan -appname "Legacy App" -createprofile false \
@@ -542,7 +539,7 @@ wait
 - **Two policy scans of the same app can't run at once.** Veracode rejects the second one. Parallel runs are fine across different apps.
 - **Shared build caches.** Parallel Maven builds writing to the same `~/.m2` usually work but occasionally corrupt a download. If you see odd build errors, give each run its own cache (`MAVEN_OPTS="-Dmaven.repo.local=./work-app-a/.m2"`), at the cost of more downloads.
 - **Resources.** Each run does a full build. Check the agent has enough CPU, memory and disk for all of them.
-- **CLI install race.** If the Veracode CLI isn't installed, every run tries to install it into the same folder at the same moment. Install it once beforehand ([use case 16](#16-using-a-pre-installed-or-pinned-veracode-cli)).
+- **CLI install race.** If the Veracode CLI isn't installed, every run tries to install it into the same folder at the same moment. Install it once beforehand ([use case 16](#16-using-a-pre-installed-or-pinned-veracode-cli-and-java-wrapper)).
 
 ---
 
@@ -721,7 +718,7 @@ pipeline {
 
 ---
 
-## 16. Using a pre-installed or pinned Veracode CLI
+## 16. Using a pre-installed or pinned Veracode CLI and Java wrapper
 
 **When:** You want every run to use the same, known CLI version, or your agents can't reach the internet to download it.
 
@@ -741,6 +738,36 @@ veracode version
 - **Parallel runs.** Avoids several runs trying to install into the same folder at once ([use case 13](#13-running-several-scans-at-once-on-one-agent)).
 
 Update the CLI on a schedule you control, and test a scan after each update.
+
+### The Java API wrapper
+
+Policy scans need the Veracode Java API wrapper. If `VERACODE_WRAPPER_JAR` isn't set, the script handles it:
+
+1. Looks up the latest release in Maven Central's metadata (or uses `VERACODE_WRAPPER_VERSION` if you set it).
+2. Checks the cache folder (`~/.cache/veracode-svn-scan`, or `VERACODE_TOOLS_DIR`) for that version.
+3. If it's not there, downloads it, checks it against the `.sha1` file Maven publishes next to it, and saves it to the cache.
+
+The cache is separate from the work folder, so it survives between runs and the download only happens once per version.
+
+**Pin the version in CI.** Without a pin, a new wrapper release changes what your next run uses:
+
+```bash
+export VERACODE_WRAPPER_VERSION='<version>'   # a version from Maven Central that you've tested
+```
+
+**Use your internal Maven proxy** if agents can't reach Maven Central:
+
+```bash
+export VERACODE_WRAPPER_REPO='https://nexus.example.com/repository/maven-central'
+```
+
+**Or skip the download entirely** by pointing at a copy you manage:
+
+```bash
+export VERACODE_WRAPPER_JAR=/opt/veracode/VeracodeJavaAPI.jar
+```
+
+If `VERACODE_WRAPPER_JAR` is set to a path that doesn't exist, the script stops rather than downloading, so a typo doesn't silently pull a different version.
 
 ---
 

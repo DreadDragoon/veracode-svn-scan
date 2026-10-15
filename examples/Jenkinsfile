@@ -8,7 +8,7 @@ pipeline {
   environment {
     VERACODE_API_KEY_ID     = credentials('veracode-api-id')
     VERACODE_API_KEY_SECRET = credentials('veracode-api-key')
-    VERACODE_WRAPPER_JAR    = '/opt/veracode/VeracodeJavaAPI.jar'
+    // VERACODE_WRAPPER_JAR is optional. Without it the script downloads the Java API wrapper and caches it.
   }
 
   stages {

@@ -71,8 +71,8 @@ Step by step:
 | Veracode CLI | Packaging and pipeline scans | Installed automatically into the current folder if it isn't on the PATH |
 | The build toolchain for your app | Packaging | The autopackager does a real build. Java apps need the right JDK and Maven or Gradle, .NET apps need the .NET SDK, and so on |
 | Java runtime | Policy scans | Any supported Java version for the wrapper |
-| `VeracodeJavaAPI.jar` | Policy scans | The Veracode Java API wrapper. The script does **not** download this one. Get it from Veracode (it's also published to Maven Central) and set `VERACODE_WRAPPER_JAR` |
-| Network access to SVN, `*.veracode.com` and (for SCA) `download.sourceclear.com` | Everything | See [troubleshooting](docs/troubleshooting.md#proxies-and-firewalls) for proxies |
+| Veracode Java API wrapper | Policy scans | Downloaded automatically from Maven Central the first time a policy scan runs, checked against its published checksum, and cached for later runs. Set `VERACODE_WRAPPER_JAR` to use a copy you already have |
+| Network access to SVN, `*.veracode.com`, Maven Central (policy scans) and (for SCA) `download.sourceclear.com` | Everything | See [troubleshooting](docs/troubleshooting.md#proxies-and-firewalls) for proxies |
 
 ### Supported languages
 
@@ -134,7 +134,10 @@ When it finishes, look in `veracode-work/results/` and check the exit code with 
 | `VERACODE_API_KEY_SECRET` | Always | Veracode API key |
 | `SVN_USERNAME` | If the repo needs auth | SVN username. See [SVN authentication](docs/svn-authentication.md) |
 | `SVN_PASSWORD` | If the repo needs auth | SVN password. Only used when `SVN_USERNAME` is set |
-| `VERACODE_WRAPPER_JAR` | Policy scans | Full path to `VeracodeJavaAPI.jar` |
+| `VERACODE_WRAPPER_JAR` | No | Path to a Java API wrapper jar you already have. If set, the script uses it and skips the download. If set to a path that doesn't exist, the script stops |
+| `VERACODE_WRAPPER_VERSION` | No | Wrapper version to download, exactly as listed on Maven Central. Default is the latest release. Pin this in CI so every run uses the same version |
+| `VERACODE_WRAPPER_REPO` | No | Maven repository to download the wrapper from. Default `https://repo1.maven.org/maven2`. Set it to your Nexus or Artifactory proxy if agents can't reach Maven Central |
+| `VERACODE_TOOLS_DIR` | No | Where the downloaded wrapper is cached between runs. Default `~/.cache/veracode-svn-scan`. Unlike the work directory, this is never wiped |
 | `SRCCLR_API_TOKEN` | With `-s` | SCA agent token |
 | `POLICY_SCAN_TIMEOUT` | No | Minutes to wait for a policy scan to finish. Default `60` |
 

@@ -1,9 +1,0 @@
-# Scan working directory
-veracode-work/
-
-# Veracode CLI binary if the script installs it locally
-/veracode
-
-# Local credential files
-.veracode/
-*.env

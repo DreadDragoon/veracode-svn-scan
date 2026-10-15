@@ -6,6 +6,7 @@ Common errors, what they mean, and how to fix them. Find the message you're seei
 
 - [Setup errors (exit 1)](#setup-errors-exit-1)
 - [Veracode CLI install](#veracode-cli-install)
+- [Java API wrapper download](#java-api-wrapper-download)
 - [SVN errors](#svn-errors)
 - [Packaging fails](#packaging-fails)
 - [Pipeline scan problems](#pipeline-scan-problems)
@@ -24,7 +25,7 @@ These come from the script's own checks, before anything runs. The `[ERROR]` lin
 | `Mode must be pipeline, policy or both` | Typo in `-m` |
 | `VERACODE_API_KEY_ID and VERACODE_API_KEY_SECRET must be set` | Export both variables, or bind them in Jenkins |
 | `Policy mode needs an app name (-a)` | Add `-a "Profile Name"` for `policy` or `both` |
-| `Set VERACODE_WRAPPER_JAR to the VeracodeJavaAPI.jar path` | The variable isn't set, or the file isn't at that path. `ls -l "$VERACODE_WRAPPER_JAR"` |
+| `VERACODE_WRAPPER_JAR is set but no file exists at ...` | The path is wrong. Fix it, or unset the variable and let the script download the wrapper |
 | `java is required for policy mode` | Install Java, or check it's on the PATH for the CI user |
 | `SRCCLR_API_TOKEN must be set for SCA (-s)` | Export the token, or drop `-s` |
 | `svn client not found` | Install the `subversion` package |
@@ -41,6 +42,19 @@ If `veracode` isn't on the PATH, the script downloads and installs it into the c
 | `Permission denied` during install | The current folder isn't writable. Run from a writable folder, or pre-install the CLI |
 | A different CLI version every run | Expected when it auto-installs. Pre-install to pin it |
 | Parallel runs fail installing at the same time | Pre-install the CLI once on the agent |
+
+## Java API wrapper download
+
+In policy mode, if `VERACODE_WRAPPER_JAR` isn't set, the script downloads the wrapper from Maven Central into `~/.cache/veracode-svn-scan` (or `VERACODE_TOOLS_DIR`) and reuses it on later runs.
+
+| Problem | Fix |
+|---|---|
+| `Could not find the latest Java API wrapper version at ...` | The agent can't reach Maven Central, or a proxy blocked it. Set `VERACODE_WRAPPER_REPO` to your Nexus or Artifactory proxy of Maven Central, see [proxies](#proxies-and-firewalls), or set `VERACODE_WRAPPER_VERSION` and pre-place the jar |
+| `Could not download https://...jar` | The version doesn't exist (check `VERACODE_WRAPPER_VERSION`), or the network dropped |
+| `Checksum mismatch for the Java API wrapper` | The download was corrupted or altered. The bad file is deleted. Run again, and if it keeps happening check whether a proxy is rewriting downloads |
+| `Warning: no .sha1 checksum found` | Your repository proxy doesn't serve checksum files. The jar is used without verification. Turn on checksum passthrough in the proxy if you can |
+| Downloads every run | The cache folder isn't persistent (common on pod agents). Point `VERACODE_TOOLS_DIR` at a persistent volume, or set `VERACODE_WRAPPER_JAR` to a pre-installed copy |
+| No write access to the cache folder | Set `VERACODE_TOOLS_DIR` to a writable folder |
 
 ## SVN errors
 
@@ -149,6 +163,7 @@ http-proxy-exceptions = *.example.com
 |---|---|
 | Your SVN server | Export |
 | `tools.veracode.com` | CLI install (skip if pre-installed) |
+| `repo1.maven.org`, or your Maven proxy via `VERACODE_WRAPPER_REPO` | Java API wrapper download (skip if `VERACODE_WRAPPER_JAR` is set) |
 | `*.veracode.com` | Pipeline and policy scans |
 | `download.sourceclear.com` and the SCA API hosts | SCA |
 | Maven Central, npm registry, NuGet, or your internal mirror | Packaging builds |
